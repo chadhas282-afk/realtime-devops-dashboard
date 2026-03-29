@@ -2,6 +2,7 @@ import 'dotenv/config';
 import http from 'http';
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { connectDatabase } from './config/database';
 import { initializeSocket } from './socket';
 import { errorHandler, notFound } from './middleware/errorHandler';
@@ -13,6 +14,23 @@ import deploymentRoutes from './routes/deployments';
 
 const app = express();
 const server = http.createServer(app);
+
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again later.' },
+});
 
 // Middleware
 app.use(
@@ -36,11 +54,11 @@ app.get('/health', (_req, res) => {
 });
 
 // Routes
-app.use('/api/tasks', taskRoutes);
-app.use('/api/activities', activityRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/auth', userRoutes);
-app.use('/api/deployments', deploymentRoutes);
+app.use('/api/tasks', apiLimiter, taskRoutes);
+app.use('/api/activities', apiLimiter, activityRoutes);
+app.use('/api/users', apiLimiter, userRoutes);
+app.use('/api/auth', authLimiter, userRoutes);
+app.use('/api/deployments', apiLimiter, deploymentRoutes);
 
 // Error handling
 app.use(notFound);
